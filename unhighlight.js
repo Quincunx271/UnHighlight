@@ -20,16 +20,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // which is licensed under GPL-v3, as is this extension.
 
 browser.webRequest.onBeforeRequest.addListener(
-    function(req)
-    {
-        var path = req.url
-        var highlightPos = path.indexOf('?highlight=')
-        if (highlightPos > -1)
-        {
-            var cleaned = path.substring(0, highlightPos)
-            console.log('Stripping highlight: ', cleaned)
+    function (req) {
+        // Note: `return;` causes the listener to apply no action. If we returned a redirect to the
+        // URL unmodified, then this listener would be triggered again due to the redirect in an
+        // infinite loop.
 
-            return {redirectUrl: cleaned}
-        }
+        // If the API is unsupported, don't strip the highlight, and therefore don't redirect.
+        if (typeof URL === undefined || typeof URLSearchParams === undefined) return;
+        const url = new URL(req.url)
+        // If there is no highlight to strip, don't redirect.
+        if (!url.searchParams.has('highlight')) return;
+        // Delete ?highlight=...
+        url.searchParams.delete('highlight')
+        // Redirect to the modified URL.
+        return { redirectUrl: url.toString() }
     },
-    {urls: ['https://*/*?*', 'http://*/*?*'], types: ['main_frame']}, ['blocking']);
+    // If there is a 'highlight' query parameter, then it should appear somewhere after the '?'.
+    { urls: ['https://*/*?*highlight*', 'http://*/*?*highlight*'], types: ['main_frame'] },
+    // We want to be able to do redirects.
+    ['blocking']);
